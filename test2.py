@@ -292,6 +292,26 @@ KBar_df['MACD'] = KBar_df['EMA_short'] - KBar_df['EMA_long']
 KBar_df['Signal'] = KBar_df['MACD'].ewm(span=SignalEMA, adjust=False).mean()
 KBar_df['Hist'] = KBar_df['MACD'] - KBar_df['Signal']
 
+#計算布林通道
+st.subheader("設定計算布林通道的週期和標準差倍數")
+BollingerPeriod = st.slider('選擇布林通道週期 (例如20)', 1, 100, 20)
+BollingerStdDev = st.slider('選擇標準差倍數 (例如2)', 1, 5, 2)
+
+def calculate_bollinger_bands(df, period=20, std_dev_multiplier=2):
+    delta = df['close'].diff()
+    middle_band = df['close'].rolling(window=period).mean()
+    standard_deviation = df['close'].rolling(window=period).std()
+    upper_band = middle_band + (standard_deviation * std_dev_multiplier)
+    lower_band = middle_band - (standard_deviation * std_dev_multiplier)
+    return  middle_band, upper_band, lower_band
+
+
+KBar_df = pd.DataFrame(KBar_dic)
+KBar_df['MA'] = KBar_df['close'].rolling(window=BollingerPeriod).mean()
+KBar_df['STD'] = KBar_df['close'].rolling(window=BollingerPeriod).std()
+KBar_df['Upper'] = KBar_df['MA'] + (KBar_df['STD'] * BollingerStdDev)
+KBar_df['Lower'] = KBar_df['MA'] - (KBar_df['STD'] * BollingerStdDev)
+
 
 ###### (5) 將 Dataframe 欄位名稱轉換  ###### 
 KBar_df.columns = [ i[0].upper()+i[1:] for i in KBar_df.columns ]
@@ -357,6 +377,21 @@ with st.expander("K線圖, MACD"):
     fig3.add_trace(go.Bar(x=KBar_df['Time'], y=KBar_df['Hist'], name='MACD 柱狀圖', marker=dict(color='green')), secondary_y=True)
     fig3.layout.yaxis2.showgrid = True
     st.plotly_chart(fig3, use_container_width=True)
+    
+##### K線圖, 布林通道
+with st.expander("K線圖, 布林通道"):
+    fig4 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig4.add_trace(go.Candlestick(x=KBar_df['time'],
+                    open=KBar_df['open'], high=KBar_df['high'],
+                    low=KBar_df['low'], close=KBar_df['close'], name='K線'),
+                   secondary_y=True)
+    #fig4.add_trace(go.Bar(x=KBar_df['time'], y=KBar_df['volume'], name='成交量', marker=dict(color='black')), secondary_y=False)
+    fig4.add_trace(go.Scatter(x=KBar_df['time'], y=KBar_df['MA'], mode='lines', line=dict(color='blue', width=2), name='移動平均線'), secondary_y=True)
+    fig4.add_trace(go.Scatter(x=KBar_df['time'], y=KBar_df['Upper'], mode='lines', line=dict(color='green', width=2), name='上軌'), secondary_y=True)
+    fig4.add_trace(go.Scatter(x=KBar_df['time'], y=KBar_df['Lower'], mode='lines', line=dict(color='red', width=2), name='下軌'), secondary_y=True)
+    fig4.layout.yaxis2.showgrid = True
+    st.plotly_chart(fig4, use_container_width=True)
+    
 
 
 
