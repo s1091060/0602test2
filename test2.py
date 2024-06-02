@@ -259,6 +259,40 @@ last_nan_index_RSI = KBar_df['RSI_long'][::-1].index[KBar_df['RSI_long'][::-1].a
 # KBar_RSI_df=pd.DataFrame(KBar_dic)
 
 
+# MACD策略
+#設定macd k棒長度
+st.subheader("設定計算MACD的週期")
+ShortEMA = st.slider('短期EMA (例如12)', 1, 100, 12)
+LongEMA = st.slider('長期EMA (例如26)', 1, 100, 26)
+SignalEMA = st.slider('信號EMA (例如9)', 1, 100, 9)
+
+##計算macd
+
+def calculate_macd(df, short_period=12, long_period=26, signal_period=9):
+    delta = df['close'].diff()
+    # 計算短期EMA
+    short_ema = df['close'].ewm(span=short_period, adjust=False).mean()
+    # 計算長期EMA
+    long_ema = df['close'].ewm(span=long_period, adjust=False).mean()
+    # 計算MACD線
+    macd_line = short_ema - long_ema
+    # 計算信號線
+    signal_line = macd_line.ewm(span=signal_period, adjust=False).mean()
+    # 計算MACD柱
+    macd_histogram = macd_line - signal_line
+    
+    return macd_line, signal_line, macd_histogram
+
+# 將 MACD 計算結果加入 DataFrame
+KBar_df['MACD_line'], KBar_df['Signal_line'], KBar_df['MACD_histogram'] = calculate_macd(KBar_df)
+
+KBar_df['EMA_short'] = KBar_df['close'].ewm(span=ShortEMA, adjust=False).mean()
+KBar_df['EMA_long'] = KBar_df['close'].ewm(span=LongEMA, adjust=False).mean()
+KBar_df['MACD'] = KBar_df['EMA_short'] - KBar_df['EMA_long']
+KBar_df['Signal'] = KBar_df['MACD'].ewm(span=SignalEMA, adjust=False).mean()
+KBar_df['Hist'] = KBar_df['MACD'] - KBar_df['Signal']
+
+
 ###### (5) 將 Dataframe 欄位名稱轉換  ###### 
 KBar_df.columns = [ i[0].upper()+i[1:] for i in KBar_df.columns ]
 
@@ -309,6 +343,20 @@ with st.expander("K線圖, 長短 RSI"):
     
     fig2.layout.yaxis2.showgrid=True
     st.plotly_chart(fig2, use_container_width=True)
+
+##### K線圖, MACD
+with st.expander("K線圖, MACD"):
+    fig3 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig3.add_trace(go.Candlestick(x=KBar_df['Time'],
+                    open=KBar_df['Open'], high=KBar_df['High'],
+                    low=KBar_df['Low'], close=KBar_df['Close'], name='K線'),
+                   secondary_y=True)
+    #fig3.add_trace(go.Bar(x=KBar_df['Time'], y=KBar_df['Volume'], name='成交量', marker=dict(color='black')), secondary_y=False)
+    fig3.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['MACD'], mode='lines', line=dict(color='blue', width=2), name='MACD'), secondary_y=True)
+    fig3.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['Signal'], mode='lines', line=dict(color='red', width=2), name='信號線'), secondary_y=True)
+    fig3.add_trace(go.Bar(x=KBar_df['Time'], y=KBar_df['Hist'], name='MACD 柱狀圖', marker=dict(color='green')), secondary_y=True)
+    fig3.layout.yaxis2.showgrid = True
+    st.plotly_chart(fig3, use_container_width=True)
 
 
 
